@@ -1,0 +1,8 @@
+{
+  "id": "juice_wrld_player",
+  "name": "Juice WRLD",
+  "version": "1.0.0",
+  "entry": "index.html",
+  "mguHmi": ["ID7"],
+  "mguInternet": true
+}

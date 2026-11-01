@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Juice WRLD</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #000;
+            color: #fff;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+        .now-playing {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex: 2;
+            padding: 40px;
+            gap: 60px;
+        }
+        .cover-art {
+            width: 350px;
+            height: 350px;
+            background-color: #1a1a1a;
+            border-radius: 12px;
+            object-fit: cover;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+        .track-info {
+            text-align: left;
+            max-width: 500px;
+        }
+        .track-info h1 {
+            font-size: 48px;
+            margin: 0 0 10px 0;
+            line-height: 1.1;
+        }
+        .track-info p {
+            font-size: 24px;
+            color: #888;
+            margin: 0;
+        }
+        .controls {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            flex: 1;
+            padding: 40px;
+            background-color: #111;
+            border-left: 1px solid #222;
+            gap: 30px;
+        }
+        .button {
+            background-color: #333;
+            color: #fff;
+            border: none;
+            border-radius: 50%;
+            width: 120px;
+            height: 120px;
+            font-size: 20px;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background-color 0.2s;
+        }
+        .button:hover, .button:focus {
+            background-color: #e63946;
+            outline: none;
+        }
+        #play-pause {
+            width: 160px;
+            height: 160px;
+            font-size: 24px;
+        }
+        .lyrics-container {
+            position: absolute;
+            bottom: 30px;
+            left: 40px;
+            right: 40px;
+            height: 100px;
+            overflow: hidden;
+            background: linear-gradient(to top, rgba(0,0,0,0.9), transparent);
+            padding: 20px;
+            font-size: 22px;
+            text-align: center;
+            color: #ccc;
+        }
+    </style>
+</head>
+<body>
+    <div class="now-playing">
+        <img id="cover-art" class="cover-art" src="" alt="Cover Art">
+        <div class="track-info">
+            <h1 id="track-title">Loading...</h1>
+            <p id="track-artist">Juice WRLD</p>
+        </div>
+    </div>
+    <div class="controls">
+        <button class="button" id="next-track">Next</button>
+        <button class="button" id="play-pause">Play</button>
+    </div>
+    <div class="lyrics-container">
+        <p id="lyrics">Lyrics will appear here...</p>
+    </div>
+    <audio id="audio-player"></audio>
+    <script src="app.js"></script>
+</body>
+</html>
