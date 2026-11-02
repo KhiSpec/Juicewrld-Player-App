@@ -1,216 +1,172 @@
-const API_BASE = "https://juicewrldapi.com";
-const RANDOM_PATH = "/juicewrld/radio/random/";
-const FILE_PATH = "/juicewrld/files/download/";
-const ART_PREFIX = "";
-
-const audio = document.getElementById("audio");
-const art = document.getElementById("art");
-const wash = document.getElementById("wash");
-const titleEl = document.getElementById("title");
-const artistNameEl = document.getElementById("artist-name");
-const albumEl = document.getElementById("album");
-const lyricsScroll = document.getElementById("lyrics-scroll");
-const iconPlay = document.getElementById("icon-play");
-const iconPause = document.getElementById("icon-pause");
-const playBtn = document.getElementById("play");
-const nextBtn = document.getElementById("next");
-const prevBtn = document.getElementById("prev");
-const shuffleBtn = document.getElementById("shuffle");
-const repeatBtn = document.getElementById("repeat");
-const likeBtn = document.getElementById("like");
-const track = document.getElementById("track");
-const fill = document.getElementById("fill");
-const thumb = document.getElementById("thumb");
-const timeElapsed = document.getElementById("time-elapsed");
-const timeRemaining = document.getElementById("time-remaining");
-const statusEl = document.getElementById("status");
-
-let isPlaying = false;
-let syncedLines = [];
-let shuffleOn = false;
-let repeatMode = "off";
-let liked = false;
-
-const pick = (obj, ...keys) => {
-  for (const k of keys) {
-    const v = k.split(".").reduce((o, p) => (o && o[p] !== undefined ? o[p] : undefined), obj);
-    if (v !== undefined && v !== null && v !== "") return v;
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Juice WRLD</title>
+<style>
+  :root {
+    --bg: #0a0b0e;
+    --text: #ffffff;
+    --dim: rgba(255,255,255,0.55);
+    --dimmer: rgba(255,255,255,0.32);
+    --accent: #1C69D4;
+    --accent2: #E32119;
+    --crit: #E32119;
+    --track: rgba(255,255,255,0.14);
+    --panel: rgba(255,255,255,0.05);
+    --panel-edge: rgba(255,255,255,0.12);
   }
-  return undefined;
-};
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg); color: var(--text); font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
 
-const fmt = (s) => {
-  if (!isFinite(s) || s < 0) return "0:00";
-  return `${Math.floor(s / 60)}:${Math.floor(s % 60).toString().padStart(2, "0")}`;
-};
-
-function setArtwork(url) {
-  if (!url) { art.classList.add("empty"); wash.classList.remove("on"); return; }
-  const full = url.startsWith("http") ? url : ART_PREFIX + url;
-  art.src = full;
-  art.classList.remove("empty");
-  wash.style.backgroundImage = `url("${full}")`;
-  wash.classList.add("on");
-}
-
-function renderLyrics(raw) {
-  lyricsScroll.innerHTML = "";
-  lyricsScroll.style.transform = "translateY(0)";
-  syncedLines = [];
-  if (!raw || typeof raw !== "string" || !raw.trim()) {
-    lyricsScroll.innerHTML = '<div class="lyric placeholder">No lyrics for this track</div>';
-    return;
+  #wash {
+    position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    background-size: cover; background-position: center;
+    filter: blur(90px) saturate(1.3);
+    opacity: 0; transition: opacity 0.6s, background-image 0.6s;
   }
-  const isLRC = /\[\d{1,2}:\d{2}(\.\d+)?\]/.test(raw);
-  if (isLRC) {
-    raw.split("\n").forEach((line) => {
-      const m = line.match(/^\[(\d{1,2}):(\d{2})(?:\.(\d+))?\](.*)$/);
-      if (!m) return;
-      const t = parseInt(m[1]) * 60 + parseInt(m[2]) + (m[3] ? parseFloat("0." + m[3]) : 0);
-      const text = m[4].trim();
-      if (!text) return;
-      const el = document.createElement("div");
-      el.className = "lyric";
-      el.textContent = text;
-      lyricsScroll.appendChild(el);
-      syncedLines.push({ time: t, el });
-    });
-  } else {
-    raw.split("\n").forEach((line) => {
-      if (!line.trim()) return;
-      const el = document.createElement("div");
-      el.className = "lyric";
-      el.textContent = line.trim();
-      lyricsScroll.appendChild(el);
-    });
-    const first = lyricsScroll.querySelector(".lyric");
-    if (first) first.classList.add("active");
+  #wash::after { content: ""; position: absolute; inset: 0; background: linear-gradient(to bottom, rgba(10,11,14,0.8) 0%, rgba(10,11,14,0.95) 60%, var(--bg) 100%); }
+  #wash.on { opacity: 0.35; }
+
+  #app {
+    position: relative; z-index: 2;
+    display: grid; grid-template-columns: auto 1fr;
+    gap: 52px; height: 100vh; padding: 40px 56px;
   }
-}
 
-function highlight(time) {
-  if (!syncedLines.length) return;
-  let idx = -1;
-  for (let i = 0; i < syncedLines.length; i++) {
-    if (time >= syncedLines[i].time) idx = i; else break;
+  #art-wrap { display: flex; align-items: center; }
+  #art {
+    height: calc(100vh - 80px); aspect-ratio: 1; border-radius: 18px;
+    object-fit: cover; background: #15161a;
+    box-shadow: 0 24px 60px rgba(0,0,0,0.6), inset 0 0 0 1px rgba(255,255,255,0.08);
+    transition: opacity 0.4s;
   }
-  syncedLines.forEach((l, i) => l.el.classList.toggle("active", i === idx));
-  if (idx >= 0) {
-    const el = syncedLines[idx].el;
-    const stage = lyricsScroll.parentElement;
-    const offset = el.offsetTop + el.offsetHeight / 2 - stage.clientHeight / 2;
-    lyricsScroll.style.transform = `translateY(${-offset}px)`;
+  #art.empty { opacity: 0; }
+
+  #right { display: flex; flex-direction: column; min-width: 0; }
+
+  .head { display: grid; grid-template-columns: 1fr auto; gap: 24px; align-items: start; padding-top: 8px; }
+  #title { font-size: 54px; font-weight: 800; letter-spacing: -1px; line-height: 1.05; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #artist { font-size: 30px; font-weight: 500; margin-top: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #artist .album { color: var(--dim); }
+  #artist .album::before { content: "  ·  "; }
+
+  .head-actions { display: flex; align-items: center; gap: 16px; padding-top: 18px; }
+  .icon-btn {
+    width: 72px; height: 72px; border-radius: 50%; background: transparent; border: none;
+    color: var(--dim); display: flex; align-items: center; justify-content: center; cursor: pointer;
+    transition: color 0.18s, background 0.18s, transform 0.12s;
   }
-}
+  .icon-btn:hover { color: var(--text); background: rgba(255,255,255,0.06); }
+  .icon-btn:active { transform: scale(0.94); }
+  .icon-btn svg { width: 38px; height: 38px; fill: currentColor; }
+  #like.liked { color: var(--crit); }
 
-async function loadRandom() {
-  try {
-    titleEl.textContent = "Loading…";
-    artistNameEl.textContent = "Juice WRLD";
-    albumEl.style.display = "none";
-    statusEl.textContent = "Loading…";
-    statusEl.className = "status-line";
-
-    const res = await fetch(API_BASE + RANDOM_PATH, { headers: { Accept: "application/json" } });
-    if (!res.ok) throw new Error("HTTP " + res.status);
-    const data = await res.json();
-    const song = data.song || data.data || data;
-
-    const title = pick(song, "name", "title", "track_name") || "Unknown Title";
-    const artist = pick(song, "credited_artists", "artist", "artists", "artist_name") || "Juice WRLD";
-    const album = pick(song, "album", "album_name");
-    const artUrl = pick(song, "image_url", "cover_art", "artwork", "image");
-    const lyrics = pick(song, "lyrics", "synced_lyrics", "plain_lyrics", "lyric");
-    const path = pick(data, "path", "song.path", "file", "download_path") ||
-                 pick(song, "path", "file_path", "stream_path");
-
-    titleEl.textContent = title;
-    artistNameEl.textContent = artist;
-    if (album) { albumEl.textContent = album; albumEl.style.display = "inline"; }
-    setArtwork(artUrl);
-    renderLyrics(lyrics);
-
-    if (path) {
-      audio.src = API_BASE + FILE_PATH + "?path=" + encodeURIComponent(path);
-      statusEl.textContent = "Ready";
-    } else {
-      audio.src = "";
-      statusEl.textContent = "No audio path";
-    }
-    isPlaying = false;
-    iconPlay.style.display = "";
-    iconPause.style.display = "none";
-    liked = false;
-    likeBtn.classList.remove("liked");
-  } catch (e) {
-    console.error(e);
-    titleEl.textContent = "Couldn't load track";
-    artistNameEl.textContent = "Check connection";
-    statusEl.textContent = "Error";
-    statusEl.className = "status-line paused";
+  #lyrics-stage {
+    flex: 1; position: relative; overflow: hidden; margin: 24px 0 20px;
+    mask-image: linear-gradient(to bottom, transparent 0%, #000 18%, #000 82%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 18%, #000 82%, transparent 100%);
   }
-}
-
-function togglePlay() {
-  if (!audio.src) return;
-  if (isPlaying) {
-    audio.pause();
-    iconPlay.style.display = "";
-    iconPause.style.display = "none";
-    statusEl.textContent = "Paused";
-    statusEl.className = "status-line paused";
-  } else {
-    audio.play().catch((e) => console.warn("play blocked:", e));
-    iconPlay.style.display = "none";
-    iconPause.style.display = "";
-    statusEl.textContent = "Playing";
-    statusEl.className = "status-line";
+  #lyrics-scroll {
+    position: absolute; left: 0; right: 0; top: 50%;
+    display: flex; flex-direction: column; gap: 18px;
+    transition: transform 0.42s cubic-bezier(0.22, 1, 0.36, 1);
   }
-  isPlaying = !isPlaying;
-}
+  .lyric { font-size: 26px; font-weight: 600; line-height: 1.32; color: var(--dimmer); transition: color 0.3s, font-size 0.3s; }
+  .lyric.active { font-size: 36px; font-weight: 800; color: var(--text); text-shadow: 0 0 24px rgba(28,105,212,0.35); }
+  .lyric.placeholder { color: var(--dimmer); font-size: 28px; font-weight: 600; }
 
-playBtn.addEventListener("click", togglePlay);
-nextBtn.addEventListener("click", loadRandom);
-prevBtn.addEventListener("click", () => {
-  if (audio.currentTime > 3) { audio.currentTime = 0; return; }
-  loadRandom();
-});
-shuffleBtn.addEventListener("click", () => {
-  shuffleOn = !shuffleOn;
-  shuffleBtn.classList.toggle("on", shuffleOn);
-});
-repeatBtn.addEventListener("click", () => {
-  repeatMode = repeatMode === "off" ? "all" : repeatMode === "all" ? "one" : "off";
-  repeatBtn.classList.toggle("on", repeatMode !== "off");
-  repeatBtn.querySelector(".label").textContent =
-    repeatMode === "off" ? "Repeat" : repeatMode === "all" ? "Repeat all" : "Repeat one";
-});
-likeBtn.addEventListener("click", () => {
-  liked = !liked;
-  likeBtn.classList.toggle("liked", liked);
-});
+  .progress { display: grid; grid-template-columns: 64px 1fr 64px; align-items: center; gap: 16px; padding: 6px 0 10px; }
+  .time { font-size: 22px; color: var(--dim); font-variant-numeric: tabular-nums; font-weight: 600; }
+  .time.right { text-align: right; }
+  #track { position: relative; height: 10px; border-radius: 5px; background: var(--track); cursor: pointer; }
+  #fill { position: absolute; inset: 0 auto 0 0; width: 0%; border-radius: 5px; background: linear-gradient(90deg, var(--accent2), var(--accent)); transition: width 0.2s linear; }
+  #fill.paused { background: var(--dim); }
+  #thumb { position: absolute; top: 50%; left: 0; width: 22px; height: 22px; border-radius: 50%; background: var(--text); transform: translate(-50%, -50%); box-shadow: 0 2px 10px rgba(0,0,0,0.5); transition: left 0.2s linear; pointer-events: none; }
+  .status-line { grid-column: 1 / -1; text-align: center; font-size: 15px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--accent); padding-top: 4px; }
+  .status-line.paused { color: var(--dim); }
 
-audio.addEventListener("timeupdate", () => {
-  const d = audio.duration || 0;
-  const c = audio.currentTime || 0;
-  const f = d ? c / d : 0;
-  fill.style.width = (f * 100) + "%";
-  fill.classList.toggle("paused", !isPlaying);
-  thumb.style.left = (f * 100) + "%";
-  timeElapsed.textContent = fmt(c);
-  timeRemaining.textContent = "-" + fmt(d - c);
-  highlight(c);
-});
+  #dock {
+    display: grid; grid-template-columns: repeat(5, 1fr);
+    background: var(--panel); border: 1px solid var(--panel-edge);
+    border-radius: 18px; height: 116px; margin-top: 8px;
+  }
+  .dock-btn {
+    background: transparent; border: none; color: var(--text); cursor: pointer;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+    transition: background 0.15s; border-radius: 18px;
+  }
+  .dock-btn:hover { background: rgba(255,255,255,0.04); }
+  .dock-btn:active { background: rgba(255,255,255,0.08); }
+  .dock-btn svg { width: 34px; height: 34px; fill: currentColor; }
+  .dock-btn .label { font-size: 12px; font-weight: 700; letter-spacing: 1.5px; color: var(--dim); text-transform: uppercase; }
+  .dock-btn.on { color: var(--accent); }
+  .dock-btn.on .label { color: var(--accent); }
+  #play .circle {
+    width: 96px; height: 96px; border-radius: 50%; background: var(--text);
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  }
+  #play .circle svg { width: 44px; height: 44px; fill: #0a0b0e; }
+  #play .label { display: none; }
+</style>
+</head>
+<body>
+  <div id="wash"></div>
+  <div id="app">
+    <div id="art-wrap"><img id="art" alt="Cover" src="" class="empty"></div>
+    <div id="right">
+      <div class="head">
+        <div>
+          <div id="title">Loading…</div>
+          <div id="artist"><span id="artist-name">Juice WRLD</span><span class="album" id="album" style="display:none"></span></div>
+        </div>
+        <div class="head-actions">
+          <button class="icon-btn" id="like" aria-label="Like">
+            <svg viewBox="0 0 24 24"><path d="M12 21s-7.5-4.9-9.6-9.1C.9 8.9 2.7 5 6.3 5c2 0 3.5 1.1 4.4 2.6h.6C12.2 6.1 13.7 5 15.7 5c3.6 0 5.4 3.9 3.9 6.9C19.5 16.1 12 21 12 21z"/></svg>
+          </button>
+        </div>
+      </div>
 
-audio.addEventListener("ended", () => {
-  if (repeatMode === "one") { audio.currentTime = 0; audio.play(); return; }
-  loadRandom();
-});
+      <div id="lyrics-stage">
+        <div id="lyrics-scroll"><div class="lyric placeholder" id="lyrics">Loading lyrics…</div></div>
+      </div>
 
-track.addEventListener("click", (e) => {
-  const r = track.getBoundingClientRect();
-  const ratio = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
-  if (audio.duration) audio.currentTime = ratio * audio.duration;
-});
+      <div class="progress">
+        <span class="time" id="time-elapsed">0:00</span>
+        <div id="track"><div id="fill"></div><div id="thumb"></div></div>
+        <span class="time right" id="time-remaining">0:00</span>
+        <div class="status-line" id="status">Connecting…</div>
+      </div>
 
-loadRandom();
+      <div id="dock">
+        <button class="dock-btn" id="shuffle" aria-label="Shuffle">
+          <svg viewBox="0 0 24 24"><path d="M17 3l4 4-4 4V8h-2.5l-3 3-1.4-1.4 3-3H17V3zM3 5h3.5l3 3-1.4 1.4L5.6 7H3V5zm14 8l4 4-4 4v-3h-2.5l-3-3 1.4-1.4 2.6 2.6H17v-3z"/></svg>
+          <span class="label">Shuffle</span>
+        </button>
+        <button class="dock-btn" id="prev" aria-label="Previous">
+          <svg viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
+          <span class="label">Prev</span>
+        </button>
+        <button class="dock-btn" id="play" aria-label="Play">
+          <span class="circle">
+            <svg id="icon-play" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+            <svg id="icon-pause" viewBox="0 0 24 24" style="display:none"><path d="M6 5h4v14H6zm8 0h4v14h-4z"/></svg>
+          </span>
+        </button>
+        <button class="dock-btn" id="next" aria-label="Next">
+          <svg viewBox="0 0 24 24"><path d="M16 6h2v12h-2zM6 18l8.5-6L6 6z"/></svg>
+          <span class="label">Next</span>
+        </button>
+        <button class="dock-btn" id="repeat" aria-label="Repeat">
+          <svg viewBox="0 0 24 24"><path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/></svg>
+          <span class="label">Repeat</span>
+        </button>
+      </div>
+    </div>
+  </div>
+  <audio id="audio" crossorigin="anonymous"></audio>
+  <script src="app.js"></script>
+</body>
+</html>
