@@ -1,8 +1,10 @@
+// ---- CONFIG: verify these against https://juicewrldapi.com docs ----
 const API_BASE = "https://juicewrldapi.com";
 const RANDOM_PATH = "/juicewrld/radio/random/";
 const FILE_PATH = "/juicewrld/files/download/";
 const ART_PREFIX = "";
 
+// ---- ELEMENTS ----
 const audio = document.getElementById("audio");
 const art = document.getElementById("art");
 const wash = document.getElementById("wash");
@@ -31,6 +33,7 @@ let shuffleOn = false;
 let repeatMode = "off";
 let liked = false;
 
+// ---- helpers ----
 const pick = (obj, ...keys) => {
   for (const k of keys) {
     const v = k.split(".").reduce((o, p) => (o && o[p] !== undefined ? o[p] : undefined), obj);
@@ -45,7 +48,11 @@ const fmt = (s) => {
 };
 
 function setArtwork(url) {
-  if (!url) { art.classList.add("empty"); wash.classList.remove("on"); return; }
+  if (!url) {
+    art.classList.add("empty");
+    wash.classList.remove("on");
+    return;
+  }
   const full = url.startsWith("http") ? url : ART_PREFIX + url;
   art.src = full;
   art.classList.remove("empty");
@@ -126,7 +133,10 @@ async function loadRandom() {
 
     titleEl.textContent = title;
     artistNameEl.textContent = artist;
-    if (album) { albumEl.textContent = album; albumEl.style.display = "inline"; }
+    if (album) {
+      albumEl.textContent = album;
+      albumEl.style.display = "inline";
+    }
     setArtwork(artUrl);
     renderLyrics(lyrics);
 
@@ -172,7 +182,10 @@ function togglePlay() {
 playBtn.addEventListener("click", togglePlay);
 nextBtn.addEventListener("click", loadRandom);
 prevBtn.addEventListener("click", () => {
-  if (audio.currentTime > 3) { audio.currentTime = 0; return; }
+  if (audio.currentTime > 3) {
+    audio.currentTime = 0;
+    return;
+  }
   loadRandom();
 });
 shuffleBtn.addEventListener("click", () => {
@@ -194,16 +207,20 @@ audio.addEventListener("timeupdate", () => {
   const d = audio.duration || 0;
   const c = audio.currentTime || 0;
   const f = d ? c / d : 0;
-  fill.style.width = (f * 100) + "%";
+  fill.style.width = f * 100 + "%";
   fill.classList.toggle("paused", !isPlaying);
-  thumb.style.left = (f * 100) + "%";
+  thumb.style.left = f * 100 + "%";
   timeElapsed.textContent = fmt(c);
   timeRemaining.textContent = "-" + fmt(d - c);
   highlight(c);
 });
 
 audio.addEventListener("ended", () => {
-  if (repeatMode === "one") { audio.currentTime = 0; audio.play(); return; }
+  if (repeatMode === "one") {
+    audio.currentTime = 0;
+    audio.play();
+    return;
+  }
   loadRandom();
 });
 
