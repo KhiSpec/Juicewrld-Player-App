@@ -1,7 +1,7 @@
 {
   "id": "juice_wrld_player",
   "name": "Juice WRLD",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "entry": "index.html",
   "mguHmi": ["ID7"],
   "mguInternet": true
