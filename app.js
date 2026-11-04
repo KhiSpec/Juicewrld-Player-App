@@ -1,7 +1,5 @@
 /* ============================================================
-   CONFIG — verify these against the Juice WRLD API docs
-   If the app shows "No audio path", open the browser console
-   (F12) and check the debug panel for what the API returned.
+   CONFIG
    ============================================================ */
 const CONFIG = {
   API_BASE: "https://juicewrldapi.com",
@@ -35,20 +33,27 @@ const timeElapsed = el("time-elapsed");
 const timeRemaining = el("time-remaining");
 const statusEl = el("status");
 const debugEl = el("debug");
+const debugToggle = el("debug-toggle");
 
 let isPlaying = false;
 let syncedLines = [];
 let shuffleOn = false;
 let repeatMode = "off";
 let liked = false;
-let currentArtUrl = "";
 
 // ---- debug ----
+let debugOpen = false;
+function toggleDebug(force) {
+  debugOpen = force !== undefined ? force : !debugOpen;
+  debugEl.classList.toggle("on", debugOpen);
+  debugToggle.classList.toggle("on", debugOpen);
+}
+debugToggle.addEventListener("click", () => toggleDebug());
+
 function debug(...args) {
   if (!CONFIG.DEBUG) return;
   const line = args.map(a => typeof a === "object" ? JSON.stringify(a, null, 2) : String(a)).join(" ");
   debugEl.textContent += line + "\n";
-  debugEl.classList.add("on");
   debugEl.scrollTop = debugEl.scrollHeight;
   console.log(...args);
 }
@@ -74,23 +79,26 @@ function setStatus(text, state) {
 
 // ---- artwork ----
 function setArtwork(url) {
-  currentArtUrl = url;
   if (!url) {
     art.classList.add("empty");
-    artPlaceholder.style.display = "flex";
+    artPlaceholder.classList.remove("hidden");
     wash.classList.remove("on");
+    debug("No artwork URL provided");
     return;
   }
+  // Prepend API_BASE for relative URLs
   const full = url.startsWith("http") ? url : CONFIG.API_BASE + url;
-  debug("Setting artwork:", full);
+  debug("Loading artwork:", full);
+
   art.onerror = () => {
-    debug("Artwork failed to load:", full);
+    debug("Artwork FAILED:", full);
     art.classList.add("empty");
-    artPlaceholder.style.display = "flex";
+    artPlaceholder.classList.remove("hidden");
   };
   art.onload = () => {
+    debug("Artwork loaded OK:", full);
     art.classList.remove("empty");
-    artPlaceholder.style.display = "none";
+    artPlaceholder.classList.add("hidden");
   };
   art.src = full;
   wash.style.backgroundImage = `url("${full}")`;
@@ -105,10 +113,11 @@ function renderLyrics(raw) {
 
   if (!raw || typeof raw !== "string" || !raw.trim()) {
     lyricsScroll.innerHTML = '<div class="lyric placeholder">No lyrics for this track</div>';
+    debug("Lyrics: empty");
     return;
   }
 
-  const isLRC = /\[\d{1,2}:\d{2}(\.\d+)?\]/.test(raw);
+  const isLRC = /\[\d{1,2}:\d{2}/.test(raw);
   if (isLRC) {
     debug("Lyrics format: LRC (synced)");
     raw.split("\n").forEach((line) => {
@@ -123,11 +132,12 @@ function renderLyrics(raw) {
       lyricsScroll.appendChild(div);
       syncedLines.push({ time: t, el: div });
     });
+    debug(`Parsed ${syncedLines.length} synced lyric lines`);
     if (!syncedLines.length) {
       lyricsScroll.innerHTML = '<div class="lyric placeholder">No lyrics for this track</div>';
     }
   } else {
-    debug("Lyrics format: plain text");
+    debug("Lyrics format: plain text (no sync)");
     raw.split("\n").forEach((line) => {
       if (!line.trim()) return;
       const div = document.createElement("div");
@@ -164,6 +174,8 @@ async function loadRandom() {
   albumEl.style.display = "none";
   lyricsScroll.innerHTML = '<div class="lyric placeholder">Loading lyrics…</div>';
   syncedLines = [];
+  art.classList.add("empty");
+  artPlaceholder.classList.remove("hidden");
 
   try {
     const url = CONFIG.API_BASE + CONFIG.RANDOM_PATH;
@@ -179,7 +191,13 @@ async function loadRandom() {
     const artist = pick(song, "credited_artists", "artist", "artists", "artist_name") || "Juice WRLD";
     const album = pick(song, "album", "album_name");
     const artUrl = pick(song, "image_url", "cover_art", "artwork", "image", "cover");
-    const lyrics = pick(song, "synced_lyrics", "lyrics", "plain_lyrics", "lyric", "lyric_text");
+
+    // Prefer synced_lyrics ONLY if it has LRC timing markers
+    let lyrics = song.synced_lyrics;
+    if (!lyrics || !/\[\d{1,2}:\d{2}/.test(lyrics)) {
+      lyrics = pick(song, "lyrics", "plain_lyrics", "lyric", "lyric_text");
+    }
+
     const path = pick(data, "path", "song.path", "file", "download_path", "url") ||
                  pick(song, "path", "file_path", "stream_path", "download_url");
 
@@ -187,6 +205,8 @@ async function loadRandom() {
 
     titleEl.textContent = title;
     artistNameEl.textContent = artist;
+    // Update placeholder initials
+    artPlaceholder.textContent = (title || "JW").split(/\s+/).map(w => w[0]).slice(0, 2).join("").toUpperCase();
     if (album) {
       albumEl.textContent = album;
       albumEl.style.display = "inline";
@@ -199,9 +219,10 @@ async function loadRandom() {
       const audioUrl = CONFIG.API_BASE + CONFIG.FILE_PATH + "?path=" + encodeURIComponent(path);
       debug("Audio URL:", audioUrl);
       audio.src = audioUrl;
+      audio.load();
       setStatus("Ready to play", "");
     } else {
-      debug("ERROR: No path found in API response. Check field names in CONFIG / pick().");
+      debug("ERROR: No path found in API response");
       audio.src = "";
       setStatus("No audio path", "error");
     }
@@ -217,7 +238,7 @@ async function loadRandom() {
     timeRemaining.textContent = "0:00";
 
   } catch (err) {
-    debug("FETCH ERROR:", err.message, err.stack);
+    debug("FETCH ERROR:", err.message);
     titleEl.textContent = "Couldn't load track";
     artistNameEl.textContent = "Check connection";
     setStatus("Error: " + err.message, "error");
@@ -227,12 +248,18 @@ async function loadRandom() {
 
 // ---- controls ----
 function togglePlay() {
-  if (!audio.src) return;
+  debug("Play button clicked. audio.src =", audio.src ? audio.src.slice(0, 80) + "..." : "(empty)");
+  if (!audio.src) {
+    debug("No audio source — cannot play");
+    setStatus("No audio source", "error");
+    return;
+  }
   if (isPlaying) {
     audio.pause();
   } else {
-    audio.play().catch((e) => {
-      debug("Play blocked:", e.message);
+    const p = audio.play();
+    if (p) p.catch((e) => {
+      debug("Play blocked:", e.name, e.message);
       setStatus("Play blocked: " + e.message, "error");
     });
   }
@@ -260,7 +287,11 @@ likeBtn.addEventListener("click", () => {
 });
 
 // ---- audio events ----
+audio.addEventListener("loadstart", () => debug("Audio: loadstart"));
+audio.addEventListener("loadedmetadata", () => debug("Audio: metadata loaded, duration =", audio.duration));
+audio.addEventListener("canplay", () => debug("Audio: canplay"));
 audio.addEventListener("play", () => {
+  debug("Audio: playing");
   isPlaying = true;
   iconPlay.style.display = "none";
   iconPause.style.display = "";
@@ -268,6 +299,7 @@ audio.addEventListener("play", () => {
 });
 
 audio.addEventListener("pause", () => {
+  debug("Audio: paused");
   isPlaying = false;
   iconPlay.style.display = "";
   iconPause.style.display = "none";
@@ -287,6 +319,7 @@ audio.addEventListener("timeupdate", () => {
 });
 
 audio.addEventListener("ended", () => {
+  debug("Audio: ended");
   if (repeatMode === "one") {
     audio.currentTime = 0;
     audio.play().catch(() => {});
@@ -318,6 +351,5 @@ track.addEventListener("click", (e) => {
 });
 
 // ---- boot ----
-debugEl.classList.toggle("on", CONFIG.DEBUG);
 debug("App started. CONFIG:", CONFIG);
 loadRandom();
