@@ -1,0 +1,8 @@
+{
+  "apps": [
+    {
+      "id": "juice_wrld_player",
+      "path": "."
+    }
+  ]
+}
