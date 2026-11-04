@@ -1,37 +1,58 @@
-// ---- CONFIG: verify these against https://juicewrldapi.com docs ----
-const API_BASE = "https://juicewrldapi.com";
-const RANDOM_PATH = "/juicewrld/radio/random/";
-const FILE_PATH = "/juicewrld/files/download/";
-const ART_PREFIX = "";
+/* ============================================================
+   CONFIG — verify these against the Juice WRLD API docs
+   If the app shows "No audio path", open the browser console
+   (F12) and check the debug panel for what the API returned.
+   ============================================================ */
+const CONFIG = {
+  API_BASE: "https://juicewrldapi.com",
+  RANDOM_PATH: "/juicewrld/radio/random/",
+  FILE_PATH: "/juicewrld/files/download/",
+  ART_PREFIX: "",           // "" if image_url is absolute, else API_BASE
+  DEBUG: true,              // set false to hide the debug panel
+};
 
-// ---- ELEMENTS ----
-const audio = document.getElementById("audio");
-const art = document.getElementById("art");
-const wash = document.getElementById("wash");
-const titleEl = document.getElementById("title");
-const artistNameEl = document.getElementById("artist-name");
-const albumEl = document.getElementById("album");
-const lyricsScroll = document.getElementById("lyrics-scroll");
-const iconPlay = document.getElementById("icon-play");
-const iconPause = document.getElementById("icon-pause");
-const playBtn = document.getElementById("play");
-const nextBtn = document.getElementById("next");
-const prevBtn = document.getElementById("prev");
-const shuffleBtn = document.getElementById("shuffle");
-const repeatBtn = document.getElementById("repeat");
-const likeBtn = document.getElementById("like");
-const track = document.getElementById("track");
-const fill = document.getElementById("fill");
-const thumb = document.getElementById("thumb");
-const timeElapsed = document.getElementById("time-elapsed");
-const timeRemaining = document.getElementById("time-remaining");
-const statusEl = document.getElementById("status");
+// ---- elements ----
+const el = (id) => document.getElementById(id);
+const audio = el("audio");
+const art = el("art");
+const artPlaceholder = el("art-placeholder");
+const wash = el("wash");
+const titleEl = el("title");
+const artistNameEl = el("artist-name");
+const albumEl = el("album");
+const lyricsScroll = el("lyrics-scroll");
+const iconPlay = el("icon-play");
+const iconPause = el("icon-pause");
+const playBtn = el("play");
+const nextBtn = el("next");
+const prevBtn = el("prev");
+const shuffleBtn = el("shuffle");
+const repeatBtn = el("repeat");
+const likeBtn = el("like");
+const track = el("track");
+const fill = el("fill");
+const thumb = el("thumb");
+const timeElapsed = el("time-elapsed");
+const timeRemaining = el("time-remaining");
+const statusEl = el("status");
+const debugEl = el("debug");
 
 let isPlaying = false;
 let syncedLines = [];
 let shuffleOn = false;
 let repeatMode = "off";
 let liked = false;
+let currentArtUrl = "";
+
+// ---- debug ----
+function debug(...args) {
+  if (!CONFIG.DEBUG) return;
+  const line = args.map(a => typeof a === "object" ? JSON.stringify(a, null, 2) : String(a)).join(" ");
+  debugEl.textContent += line + "\n";
+  debugEl.classList.add("on");
+  debugEl.scrollTop = debugEl.scrollHeight;
+  console.log(...args);
+}
 
 // ---- helpers ----
 const pick = (obj, ...keys) => {
@@ -47,89 +68,123 @@ const fmt = (s) => {
   return `${Math.floor(s / 60)}:${Math.floor(s % 60).toString().padStart(2, "0")}`;
 };
 
+function setStatus(text, state) {
+  statusEl.textContent = text;
+  statusEl.className = state || "";
+}
+
+// ---- artwork ----
 function setArtwork(url) {
+  currentArtUrl = url;
   if (!url) {
     art.classList.add("empty");
+    artPlaceholder.style.display = "flex";
     wash.classList.remove("on");
     return;
   }
-  const full = url.startsWith("http") ? url : ART_PREFIX + url;
+  const full = url.startsWith("http") ? url : CONFIG.ART_PREFIX + url;
+  debug("Setting artwork:", full);
+  art.onerror = () => {
+    debug("Artwork failed to load:", full);
+    art.classList.add("empty");
+    artPlaceholder.style.display = "flex";
+  };
+  art.onload = () => {
+    art.classList.remove("empty");
+    artPlaceholder.style.display = "none";
+  };
   art.src = full;
-  art.classList.remove("empty");
   wash.style.backgroundImage = `url("${full}")`;
   wash.classList.add("on");
 }
 
+// ---- lyrics ----
 function renderLyrics(raw) {
   lyricsScroll.innerHTML = "";
   lyricsScroll.style.transform = "translateY(0)";
   syncedLines = [];
+
   if (!raw || typeof raw !== "string" || !raw.trim()) {
     lyricsScroll.innerHTML = '<div class="lyric placeholder">No lyrics for this track</div>';
     return;
   }
+
   const isLRC = /\[\d{1,2}:\d{2}(\.\d+)?\]/.test(raw);
   if (isLRC) {
+    debug("Lyrics format: LRC (synced)");
     raw.split("\n").forEach((line) => {
       const m = line.match(/^\[(\d{1,2}):(\d{2})(?:\.(\d+))?\](.*)$/);
       if (!m) return;
       const t = parseInt(m[1]) * 60 + parseInt(m[2]) + (m[3] ? parseFloat("0." + m[3]) : 0);
       const text = m[4].trim();
       if (!text) return;
-      const el = document.createElement("div");
-      el.className = "lyric";
-      el.textContent = text;
-      lyricsScroll.appendChild(el);
-      syncedLines.push({ time: t, el });
+      const div = document.createElement("div");
+      div.className = "lyric";
+      div.textContent = text;
+      lyricsScroll.appendChild(div);
+      syncedLines.push({ time: t, el: div });
     });
+    if (!syncedLines.length) {
+      lyricsScroll.innerHTML = '<div class="lyric placeholder">No lyrics for this track</div>';
+    }
   } else {
+    debug("Lyrics format: plain text");
     raw.split("\n").forEach((line) => {
       if (!line.trim()) return;
-      const el = document.createElement("div");
-      el.className = "lyric";
-      el.textContent = line.trim();
-      lyricsScroll.appendChild(el);
+      const div = document.createElement("div");
+      div.className = "lyric";
+      div.textContent = line.trim();
+      lyricsScroll.appendChild(div);
     });
     const first = lyricsScroll.querySelector(".lyric");
     if (first) first.classList.add("active");
   }
 }
 
-function highlight(time) {
+function highlightLyrics(time) {
   if (!syncedLines.length) return;
   let idx = -1;
   for (let i = 0; i < syncedLines.length; i++) {
-    if (time >= syncedLines[i].time) idx = i; else break;
+    if (time >= syncedLines[i].time) idx = i;
+    else break;
   }
   syncedLines.forEach((l, i) => l.el.classList.toggle("active", i === idx));
   if (idx >= 0) {
-    const el = syncedLines[idx].el;
+    const lineEl = syncedLines[idx].el;
     const stage = lyricsScroll.parentElement;
-    const offset = el.offsetTop + el.offsetHeight / 2 - stage.clientHeight / 2;
+    const offset = lineEl.offsetTop + lineEl.offsetHeight / 2 - stage.clientHeight / 2;
     lyricsScroll.style.transform = `translateY(${-offset}px)`;
   }
 }
 
+// ---- load ----
 async function loadRandom() {
+  setStatus("Loading…", "");
+  titleEl.textContent = "Loading…";
+  artistNameEl.textContent = "Juice WRLD";
+  albumEl.style.display = "none";
+  lyricsScroll.innerHTML = '<div class="lyric placeholder">Loading lyrics…</div>';
+  syncedLines = [];
+
   try {
-    titleEl.textContent = "Loading…";
-    artistNameEl.textContent = "Juice WRLD";
-    albumEl.style.display = "none";
-    statusEl.textContent = "Loading…";
-    statusEl.className = "status-line";
-
-    const res = await fetch(API_BASE + RANDOM_PATH, { headers: { Accept: "application/json" } });
-    if (!res.ok) throw new Error("HTTP " + res.status);
+    const url = CONFIG.API_BASE + CONFIG.RANDOM_PATH;
+    debug("Fetching:", url);
+    const res = await fetch(url, { headers: { Accept: "application/json" } });
+    debug("Response status:", res.status);
+    if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
     const data = await res.json();
-    const song = data.song || data.data || data;
+    debug("Raw API response:", data);
 
-    const title = pick(song, "name", "title", "track_name") || "Unknown Title";
+    const song = data.song || data.data || data;
+    const title = pick(song, "name", "title", "track_name", "song_name") || "Unknown Title";
     const artist = pick(song, "credited_artists", "artist", "artists", "artist_name") || "Juice WRLD";
     const album = pick(song, "album", "album_name");
-    const artUrl = pick(song, "image_url", "cover_art", "artwork", "image");
-    const lyrics = pick(song, "lyrics", "synced_lyrics", "plain_lyrics", "lyric");
-    const path = pick(data, "path", "song.path", "file", "download_path") ||
-                 pick(song, "path", "file_path", "stream_path");
+    const artUrl = pick(song, "image_url", "cover_art", "artwork", "image", "cover");
+    const lyrics = pick(song, "lyrics", "synced_lyrics", "plain_lyrics", "lyric", "lyric_text");
+    const path = pick(data, "path", "song.path", "file", "download_path", "url") ||
+                 pick(song, "path", "file_path", "stream_path", "download_url");
+
+    debug("Extracted → title:", title, "| artist:", artist, "| art:", artUrl, "| path:", path);
 
     titleEl.textContent = title;
     artistNameEl.textContent = artist;
@@ -137,55 +192,57 @@ async function loadRandom() {
       albumEl.textContent = album;
       albumEl.style.display = "inline";
     }
+
     setArtwork(artUrl);
     renderLyrics(lyrics);
 
     if (path) {
-      audio.src = API_BASE + FILE_PATH + "?path=" + encodeURIComponent(path);
-      statusEl.textContent = "Ready";
+      const audioUrl = CONFIG.API_BASE + CONFIG.FILE_PATH + "?path=" + encodeURIComponent(path);
+      debug("Audio URL:", audioUrl);
+      audio.src = audioUrl;
+      setStatus("Ready to play", "");
     } else {
+      debug("ERROR: No path found in API response. Check field names in CONFIG / pick().");
       audio.src = "";
-      statusEl.textContent = "No audio path";
+      setStatus("No audio path", "error");
     }
+
     isPlaying = false;
     iconPlay.style.display = "";
     iconPause.style.display = "none";
     liked = false;
     likeBtn.classList.remove("liked");
-  } catch (e) {
-    console.error(e);
+    fill.style.width = "0%";
+    thumb.style.left = "0%";
+    timeElapsed.textContent = "0:00";
+    timeRemaining.textContent = "0:00";
+
+  } catch (err) {
+    debug("FETCH ERROR:", err.message, err.stack);
     titleEl.textContent = "Couldn't load track";
     artistNameEl.textContent = "Check connection";
-    statusEl.textContent = "Error";
-    statusEl.className = "status-line paused";
+    setStatus("Error: " + err.message, "error");
+    lyricsScroll.innerHTML = '<div class="lyric placeholder">—</div>';
   }
 }
 
+// ---- controls ----
 function togglePlay() {
   if (!audio.src) return;
   if (isPlaying) {
     audio.pause();
-    iconPlay.style.display = "";
-    iconPause.style.display = "none";
-    statusEl.textContent = "Paused";
-    statusEl.className = "status-line paused";
   } else {
-    audio.play().catch((e) => console.warn("play blocked:", e));
-    iconPlay.style.display = "none";
-    iconPause.style.display = "";
-    statusEl.textContent = "Playing";
-    statusEl.className = "status-line";
+    audio.play().catch((e) => {
+      debug("Play blocked:", e.message);
+      setStatus("Play blocked: " + e.message, "error");
+    });
   }
-  isPlaying = !isPlaying;
 }
 
 playBtn.addEventListener("click", togglePlay);
 nextBtn.addEventListener("click", loadRandom);
 prevBtn.addEventListener("click", () => {
-  if (audio.currentTime > 3) {
-    audio.currentTime = 0;
-    return;
-  }
+  if (audio.currentTime > 3) { audio.currentTime = 0; return; }
   loadRandom();
 });
 shuffleBtn.addEventListener("click", () => {
@@ -203,31 +260,65 @@ likeBtn.addEventListener("click", () => {
   likeBtn.classList.toggle("liked", liked);
 });
 
+// ---- audio events ----
+audio.addEventListener("play", () => {
+  isPlaying = true;
+  iconPlay.style.display = "none";
+  iconPause.style.display = "";
+  setStatus("Playing", "playing");
+});
+
+audio.addEventListener("pause", () => {
+  isPlaying = false;
+  iconPlay.style.display = "";
+  iconPause.style.display = "none";
+  setStatus("Paused", "paused");
+});
+
 audio.addEventListener("timeupdate", () => {
   const d = audio.duration || 0;
   const c = audio.currentTime || 0;
   const f = d ? c / d : 0;
-  fill.style.width = f * 100 + "%";
+  fill.style.width = (f * 100) + "%";
   fill.classList.toggle("paused", !isPlaying);
-  thumb.style.left = f * 100 + "%";
+  thumb.style.left = (f * 100) + "%";
   timeElapsed.textContent = fmt(c);
   timeRemaining.textContent = "-" + fmt(d - c);
-  highlight(c);
+  highlightLyrics(c);
 });
 
 audio.addEventListener("ended", () => {
   if (repeatMode === "one") {
     audio.currentTime = 0;
-    audio.play();
+    audio.play().catch(() => {});
     return;
   }
   loadRandom();
 });
 
+audio.addEventListener("error", () => {
+  const code = audio.error ? audio.error.code : "?";
+  const msg = {
+    1: "aborted",
+    2: "network error",
+    3: "decode error (codec not supported?)",
+    4: "format not supported or source not found",
+  }[code] || "unknown";
+  debug("AUDIO ERROR:", code, msg, "| src:", audio.src);
+  setStatus("Audio error: " + msg, "error");
+});
+
+// ---- seek ----
 track.addEventListener("click", (e) => {
   const r = track.getBoundingClientRect();
   const ratio = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
-  if (audio.duration) audio.currentTime = ratio * audio.duration;
+  if (audio.duration) {
+    audio.currentTime = ratio * audio.duration;
+    debug("Seek to", Math.round(ratio * audio.duration), "s");
+  }
 });
 
+// ---- boot ----
+debugEl.classList.toggle("on", CONFIG.DEBUG);
+debug("App started. CONFIG:", CONFIG);
 loadRandom();
