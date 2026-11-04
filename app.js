@@ -158,10 +158,10 @@ function highlightLyrics(time) {
     else break;
   }
   syncedLines.forEach((l, i) => l.el.classList.toggle("active", i === idx));
-  if (idx >= 0) {
-    const lineEl = syncedLines[idx].el;
-    const stage = lyricsScroll.parentElement;
-    const offset = lineEl.offsetTop + lineEl.offsetHeight / 2 - stage.clientHeight / 2;
+  // Center the active line (or the first line if nothing is active yet)
+  const target = idx >= 0 ? syncedLines[idx] : syncedLines[0];
+  if (target) {
+    const offset = target.el.offsetTop + target.el.offsetHeight / 2;
     lyricsScroll.style.transform = `translateY(${-offset}px)`;
   }
 }
