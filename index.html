@@ -43,7 +43,7 @@
     box-shadow: 0 24px 60px rgba(0,0,0,0.6), inset 0 0 0 1px rgba(255,255,255,0.08);
     transition: opacity 0.4s;
   }
-  #art.empty { opacity: 0; }
+  #art.empty { opacity: 0; pointer-events: none; }
   #art-placeholder {
     height: min(calc(100vh - 2 * var(--pad)), var(--art-max));
     aspect-ratio: 1; border-radius: 18px;
@@ -51,7 +51,9 @@
     display: flex; align-items: center; justify-content: center;
     font-size: 80px; font-weight: 800; color: rgba(255,255,255,0.5);
     box-shadow: 0 24px 60px rgba(0,0,0,0.6), inset 0 0 0 1px rgba(255,255,255,0.08);
+    position: absolute;
   }
+  #art-placeholder.hidden { display: none; }
 
   #right { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 
@@ -104,16 +106,36 @@
   #play .circle svg { width: 46%; height: 46%; fill: #0a0b0e; }
   #play .label { display: none; }
 
-  #debug { position: fixed; bottom: 0; left: 0; right: 0; max-height: 40vh; overflow: auto; background: rgba(0,0,0,0.92); color: #7fdb8b; font-family: monospace; font-size: 12px; padding: 10px 14px; z-index: 100; display: none; white-space: pre-wrap; word-break: break-all; border-top: 2px solid var(--accent); }
+  /* ---- debug: hidden by default, toggle with button ---- */
+  #debug-toggle {
+    position: fixed; top: 10px; right: 10px; z-index: 300;
+    background: rgba(0,0,0,0.75); color: #7fdb8b;
+    border: 1px solid rgba(127,219,139,0.4); border-radius: 16px;
+    padding: 6px 14px; font-family: monospace; font-size: 12px; font-weight: 700;
+    cursor: pointer; opacity: 0.5; transition: opacity 0.2s;
+  }
+  #debug-toggle:hover { opacity: 1; }
+  #debug-toggle.on { opacity: 1; background: rgba(127,219,139,0.2); }
+
+  #debug {
+    position: fixed; bottom: 0; left: 0; right: 0; max-height: 45vh; overflow: auto;
+    background: rgba(0,0,0,0.95); color: #7fdb8b; font-family: monospace; font-size: 12px;
+    padding: 12px 16px; z-index: 200; white-space: pre-wrap; word-break: break-all;
+    border-top: 2px solid var(--accent); display: none;
+  }
   #debug.on { display: block; }
 </style>
 </head>
 <body>
   <div id="wash"></div>
+
+  <button id="debug-toggle">Debug</button>
+  <div id="debug"></div>
+
   <div id="app">
     <div id="art-wrap">
       <img id="art" alt="Cover" src="" class="empty">
-      <div id="art-placeholder" style="display:none">JW</div>
+      <div id="art-placeholder">JW</div>
     </div>
     <div id="right">
       <div class="head">
@@ -165,7 +187,6 @@
       </div>
     </div>
   </div>
-  <div id="debug"></div>
   <audio id="audio"></audio>
   <script src="app.js"></script>
 </body>
