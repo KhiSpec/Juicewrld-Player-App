@@ -7,8 +7,7 @@ const CONFIG = {
   API_BASE: "https://juicewrldapi.com",
   RANDOM_PATH: "/juicewrld/radio/random/",
   FILE_PATH: "/juicewrld/files/download/",
-  ART_PREFIX: "",           // "" if image_url is absolute, else API_BASE
-  DEBUG: true,              // set false to hide the debug panel
+  DEBUG: true,
 };
 
 // ---- elements ----
@@ -82,7 +81,7 @@ function setArtwork(url) {
     wash.classList.remove("on");
     return;
   }
-  const full = url.startsWith("http") ? url : CONFIG.ART_PREFIX + url;
+  const full = url.startsWith("http") ? url : CONFIG.API_BASE + url;
   debug("Setting artwork:", full);
   art.onerror = () => {
     debug("Artwork failed to load:", full);
@@ -180,7 +179,7 @@ async function loadRandom() {
     const artist = pick(song, "credited_artists", "artist", "artists", "artist_name") || "Juice WRLD";
     const album = pick(song, "album", "album_name");
     const artUrl = pick(song, "image_url", "cover_art", "artwork", "image", "cover");
-    const lyrics = pick(song, "lyrics", "synced_lyrics", "plain_lyrics", "lyric", "lyric_text");
+    const lyrics = pick(song, "synced_lyrics", "lyrics", "plain_lyrics", "lyric", "lyric_text");
     const path = pick(data, "path", "song.path", "file", "download_path", "url") ||
                  pick(song, "path", "file_path", "stream_path", "download_url");
 
